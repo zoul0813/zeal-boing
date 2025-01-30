@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <zos_vfs.h>
 #include <zos_sys.h>
 #include <zos_video.h>
@@ -16,6 +17,9 @@
 #define EDGE_TOP    (SCREEN_HEIGHT - (SPRITE_HEIGHT * 6))
 #define EDGE_BOTTOM (0)
 
+#define VELOCITY_Y    4
+#define VELOCITY_X    2
+
 gfx_context vctx;
 uint8_t frames = 0;
 
@@ -24,8 +28,8 @@ Point ball    = {
     .y = EDGE_TOP - SPRITE_HEIGHT,
 };
 Direction direction = {
-    .x = 1,
-    .y = 1,
+    .x = VELOCITY_X,
+    .y = VELOCITY_Y,
 };
 
 static uint16_t palette[PALETTE_SIZE];
@@ -141,22 +145,22 @@ void bounce_ball(void)
     ball.x += direction.x;
     ball.y += direction.y;
 
-    if(ball.y < 1) {
-        direction.y = 1;
+    if(ball.y < VELOCITY_Y) {
+        direction.y = VELOCITY_Y;
         ball.y = 1;
     }
     if(ball.y > EDGE_TOP) {
-        ball.y = EDGE_TOP - 1;
-        direction.y = -1;
+        direction.y = -VELOCITY_Y;
+        ball.y = EDGE_TOP - VELOCITY_Y;
     }
 
     if (ball.x > EDGE_RIGHT) {
-        ball.x      = EDGE_RIGHT - 1;
-        direction.x = -1;
+        direction.x = -VELOCITY_X;
+        ball.x      = EDGE_RIGHT - VELOCITY_X;
     }
-    if (ball.x < 1) {
-        ball.x      = 1;
-        direction.x = 1;
+    if (ball.x < VELOCITY_X) {
+        direction.x = VELOCITY_X;
+        ball.x      = VELOCITY_X;
     }
 }
 
@@ -174,7 +178,8 @@ int main(void)
 
         frames++;
 
-        shift_palette();
+        for(uint8_t i = 0; i < abs(direction.x); i++)
+            shift_palette();
         bounce_ball();
 
         gfx_wait_vblank(&vctx);

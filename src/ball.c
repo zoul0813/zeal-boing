@@ -105,7 +105,7 @@ void shift_palette(void)
             uint16_t* p1 = &palette[PALETTE_SIZE - 1]; // last
             uint16_t* p2 = &palette[PALETTE_SIZE - 2]; // 2nd to last
             uint16_t last_color = *p1;
-            for (i = PALETTE_SIZE; i > 0; i--) {
+            for (i = 0; i < PALETTE_SIZE - 1; i++) {
                 *(p1--) = *(p2--);
             }
             *p1 = last_color;

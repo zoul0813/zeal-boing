@@ -1,2 +1,5 @@
 bin/
 tmp/
+*.ztp
+*.zts
+*.ztm

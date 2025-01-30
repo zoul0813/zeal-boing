@@ -3,17 +3,31 @@
 #include <zos_sys.h>
 #include <zos_video.h>
 #include <zvb_gfx.h>
-// #include <zgdk.h>
-#include "input.h"
-#include "misc.h"
+#include <zgdk.h>
 
 #include "ball.h"
 #include "assets.h"
 
+#define BALL_HEIGHT 6
+#define BALL_WIDTH  7
+
+#define EDGE_LEFT   (0)
+#define EDGE_RIGHT  (SCREEN_WIDTH - (SPRITE_WIDTH * 6))
+#define EDGE_TOP    (SCREEN_HEIGHT - (SPRITE_HEIGHT * 6))
+#define EDGE_BOTTOM (0)
+
 gfx_context vctx;
 uint8_t frames = 0;
-Direction direction = { .x = DIRECTION_LEFT, .y = DIRECTION_DOWN };
-gfx_sprite sprites[SPRITE_COUNT];
+
+Point ball    = {
+    .x = EDGE_RIGHT / 2,
+    .y = EDGE_TOP - SPRITE_HEIGHT,
+};
+Direction direction = {
+    .x = 1,
+    .y = 1,
+};
+
 static uint16_t palette[PALETTE_SIZE];
 
 void handle_error(zos_err_t err, const char* message, uint8_t fatal)
@@ -32,6 +46,7 @@ void init(void)
     zos_err_t err;
 
     err = input_init(1);
+    handle_error(err, "failed to init input", 1);
 
     gfx_enable_screen(0);
 
@@ -52,26 +67,25 @@ void init(void)
 
 void deinit(void)
 {
+    tilemap_scroll(0, 0, 0);
+    tilemap_scroll(1, 0, 0);
+
     // reset screen
     ioctl(DEV_STDOUT, CMD_RESET_SCREEN, NULL);
 }
 
-void load_tilemap(void)
+void clear_layers(void)
 {
     uint8_t y, x;
-    uint8_t line0[WIDTH];
-    uint8_t line1[WIDTH];
-    for (y = 0; y < HEIGHT; y++) {
-        // uint8_t ball1 = (y & 0x1) == 0 ? BALL1 : BALL2;
-        // uint8_t ball2 = (y & 0x1) == 0 ? BALL2 : BALL1;
-        for (x = 0; x < WIDTH; x++) {
-            // line0[x] = (x & 0x01) == 0 ? ball1 : ball2;
-            // line0[x] = BALL1;
+    uint8_t line0[80];
+    uint8_t line1[80];
+    for (y = 0; y < 40; y++) {
+        for (x = 0; x < 80; x++) {
             line0[x] = 0;
             line1[x] = 0;
         }
-        gfx_tilemap_load(&vctx, line0, WIDTH, 0, 0, y);
-        gfx_tilemap_load(&vctx, line1, WIDTH, 1, 0, y);
+        gfx_tilemap_load(&vctx, line0, 80, 0, 0, y);
+        gfx_tilemap_load(&vctx, line1, 80, 1, 0, y);
     }
 }
 
@@ -91,66 +105,58 @@ void setup_palette(void)
 void shift_palette(void)
 {
     uint8_t i;
-    switch(direction.x) {
-        case DIRECTION_LEFT: {
-            uint16_t* p1 = &palette[0];
-            uint16_t* p2 = &palette[1];
-            uint16_t first_color = *p1;
-            for (i = 0; i < PALETTE_SIZE - 1; i++) {
-                *(p1++) = *(p2++);
-            }
-            *p1 = first_color;
-        } break;
-        case DIRECTION_RIGHT: {
-            uint16_t* p1 = &palette[PALETTE_SIZE - 1]; // last
-            uint16_t* p2 = &palette[PALETTE_SIZE - 2]; // 2nd to last
-            uint16_t last_color = *p1;
-            for (i = 0; i < PALETTE_SIZE - 1; i++) {
-                *(p1--) = *(p2--);
-            }
-            *p1 = last_color;
-        } break;
-    }
-}
-
-void setup_ball(void) {
-    uint8_t x = 0, x_offset = (SCREEN_WIDTH / 4) + (SPRITE_WIDTH);
-    uint8_t y = 0, y_offset = (SCREEN_HEIGHT / 4);
-
-    gfx_sprite* sprite = &sprites[0];
-    for (uint8_t i = 0; i < SPRITE_COUNT; i++) {
-        if((i % 7) == 0) {
-            x = 0;
-            y += SPRITE_HEIGHT;
+    if (direction.x > 0) {
+        uint16_t* p1        = &palette[PALETTE_SIZE - 1]; // last
+        uint16_t* p2        = &palette[PALETTE_SIZE - 2]; // 2nd to last
+        uint16_t last_color = *p1;
+        for (i = 0; i < PALETTE_SIZE - 1; i++) {
+            *(p1--) = *(p2--);
         }
-
-        sprite->flags      = SPRITE_NONE;
-        sprite->tile       = SPRITE_INDEX + i;
-        sprite->x          = x_offset + x;
-        sprite->y          = y_offset + y;
-
-        x += SPRITE_WIDTH;
-
-        sprite++;
+        *p1 = last_color;
+    } else {
+        uint16_t* p1         = &palette[0];
+        uint16_t* p2         = &palette[1];
+        uint16_t first_color = *p1;
+        for (i = 0; i < PALETTE_SIZE - 1; i++) {
+            *(p1++) = *(p2++);
+        }
+        *p1 = first_color;
     }
-    gfx_sprite_render_array(&vctx, 0, sprites, SPRITE_COUNT);
 }
 
-void bounce_ball(void) {
-    gfx_sprite* sprite = &sprites[0];
-    uint16_t x = sprite->x;
-    uint16_t y = sprite->y;
+void setup_ball(void)
+{
+    uint8_t x, y, i = 0;
+    uint8_t line[BALL_WIDTH];
+    for (y = 0; y < BALL_HEIGHT; y++) {
+        for (x = 0; x < BALL_WIDTH; x++, i++) {
+            line[x] = SPRITE_INDEX + i;
+        }
+        gfx_tilemap_load(&vctx, line, BALL_WIDTH, 1, WIDTH - BALL_HEIGHT, HEIGHT - BALL_HEIGHT + y);
+    }
+}
 
-    if(x < 17) direction.x = DIRECTION_RIGHT;
-    if(x > SCREEN_WIDTH - (SPRITE_WIDTH * 5)) direction.x = DIRECTION_LEFT;
+void bounce_ball(void)
+{
+    ball.x += direction.x;
+    ball.y += direction.y;
 
-    if(y < 17) direction.y = DIRECTION_DOWN;
-    if(y > SCREEN_HEIGHT - (SPRITE_HEIGHT * 5)) direction.y = DIRECTION_UP;
+    if(ball.y < 1) {
+        direction.y = 1;
+        ball.y = 1;
+    }
+    if(ball.y > EDGE_TOP) {
+        ball.y = EDGE_TOP - 1;
+        direction.y = -1;
+    }
 
-    for (uint8_t i = 0; i < SPRITE_COUNT; i++) {
-        sprite->x += direction.x;
-        sprite->y += direction.y;
-        sprite++;
+    if (ball.x > EDGE_RIGHT) {
+        ball.x      = EDGE_RIGHT - 1;
+        direction.x = -1;
+    }
+    if (ball.x < 1) {
+        ball.x      = 1;
+        direction.x = 1;
     }
 }
 
@@ -158,8 +164,8 @@ int main(void)
 {
     init();
     setup_palette();
+    clear_layers();
     setup_ball();
-    load_tilemap();
     uint16_t input = 0;
     while (1) {
         input = input_get();
@@ -167,16 +173,13 @@ int main(void)
             break;
 
         frames++;
-        // TSTATE_LOG(2);
+
         shift_palette();
         bounce_ball();
-        // TSTATE_LOG(2);
+
         gfx_wait_vblank(&vctx);
-        // TSTATE_LOG(1);
+        tilemap_scroll(1, ball.x, ball.y);
         gfx_palette_load(&vctx, palette, sizeof(palette), PALETTE_INDEX);
-        // sprites_render(&vctx);
-        gfx_sprite_render_array(&vctx, 0, sprites, SPRITE_COUNT);
-        // TSTATE_LOG(1);
         gfx_wait_end_vblank(&vctx);
     }
     deinit();

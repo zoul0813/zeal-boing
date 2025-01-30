@@ -31,4 +31,3 @@
 
 void init(void);
 void deinit(void);
-void load_tilemap(void);

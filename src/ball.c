@@ -18,7 +18,7 @@
 #define EDGE_BOTTOM (0)
 
 #define VELOCITY_Y    4
-#define VELOCITY_X    2
+#define VELOCITY_X    1
 
 gfx_context vctx;
 uint8_t frames = 0;
@@ -142,15 +142,22 @@ void setup_ball(void)
 
 void bounce_ball(void)
 {
+    static int16_t acceleration = 0;
+
     ball.x += direction.x;
-    ball.y += direction.y;
+    ball.y -= acceleration / 8;
+
+    acceleration++;
 
     if(ball.y < VELOCITY_Y) {
-        direction.y = VELOCITY_Y;
+        acceleration = -acceleration;
+        /* Compensate the acceleration to make sure we don't hit the top */
+        acceleration += 1;
         ball.y = 1;
     }
+
     if(ball.y > EDGE_TOP) {
-        direction.y = -VELOCITY_Y;
+        acceleration = -acceleration;
         ball.y = EDGE_TOP - VELOCITY_Y;
     }
 

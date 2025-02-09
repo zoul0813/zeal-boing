@@ -9,32 +9,41 @@
 #include "ball.h"
 #include "assets.h"
 
-#define BALL_HEIGHT 6
-#define BALL_WIDTH  7
+#define BALL_HEIGHT 8
+#define BALL_WIDTH  8
 
 #define EDGE_LEFT   (0)
-#define EDGE_RIGHT  (SCREEN_WIDTH - (SPRITE_WIDTH * 6))
-#define EDGE_TOP    (SCREEN_HEIGHT - (SPRITE_HEIGHT * 6))
+#define EDGE_RIGHT  (SCREEN_WIDTH - (SPRITE_WIDTH * BALL_WIDTH))
+#define EDGE_TOP    (SCREEN_HEIGHT - (SPRITE_HEIGHT * BALL_HEIGHT))
 #define EDGE_BOTTOM (0)
 
 #define VELOCITY_Y    4
 #define VELOCITY_X    1
 
-gfx_context vctx;
-uint8_t frames = 0;
-
-Point ball    = {
+static gfx_context vctx;
+static uint8_t frames = 0;
+static Point ball    = {
     .x = EDGE_RIGHT / 2,
     .y = EDGE_TOP - SPRITE_HEIGHT,
 };
-Direction direction = {
+static Direction direction = {
     .x = VELOCITY_X,
     .y = VELOCITY_Y,
 };
-
 static uint16_t palette[PALETTE_SIZE];
 
-void handle_error(zos_err_t err, const char* message, uint8_t fatal)
+
+static void deinit(void)
+{
+    tilemap_scroll(0, 0, 0);
+    tilemap_scroll(1, 0, 0);
+
+    // reset screen
+    ioctl(DEV_STDOUT, CMD_RESET_SCREEN, NULL);
+}
+
+
+static void handle_error(zos_err_t err, const char* message, uint8_t fatal)
 {
     if (err != ERR_SUCCESS) {
         if (fatal)
@@ -45,55 +54,44 @@ void handle_error(zos_err_t err, const char* message, uint8_t fatal)
     }
 }
 
-void init(void)
+
+static void init(void)
 {
     zos_err_t err;
 
     err = input_init(1);
-    handle_error(err, "failed to init input", 1);
+    handle_error(err, "Failed to init input", 1);
 
     gfx_enable_screen(0);
 
     err = gfx_initialize(ZVB_CTRL_VID_MODE_GFX_320_8BIT, &vctx);
-    handle_error(err, "failed to init graphics", 1);
+    handle_error(err, "Failed to init graphics", 1);
 
     err = load_palette(&vctx);
     handle_error(err, "Failed to load palette", 1);
 
-    gfx_tileset_options options = {
-        .compression = TILESET_COMP_RLE,
-    };
-    err = load_tileset(&vctx, &options);
+    err = load_tileset(&vctx);
     handle_error(err, "Failed to load tileset", 1);
 
     gfx_enable_screen(1);
 }
 
-void deinit(void)
-{
-    tilemap_scroll(0, 0, 0);
-    tilemap_scroll(1, 0, 0);
 
-    // reset screen
-    ioctl(DEV_STDOUT, CMD_RESET_SCREEN, NULL);
-}
-
-void clear_layers(void)
+static void clear_layers(void)
 {
     uint8_t y, x;
-    uint8_t line0[80];
-    uint8_t line1[80];
+    uint8_t line[80];
+    for (x = 0; x < 80; x++) {
+        line[x] = 0;
+    }
     for (y = 0; y < 40; y++) {
-        for (x = 0; x < 80; x++) {
-            line0[x] = 0;
-            line1[x] = 0;
-        }
-        gfx_tilemap_load(&vctx, line0, 80, 0, 0, y);
-        gfx_tilemap_load(&vctx, line1, 80, 1, 0, y);
+        gfx_tilemap_load(&vctx, line, 80, 0, 0, y);
+        gfx_tilemap_load(&vctx, line, 80, 1, 0, y);
     }
 }
 
-void setup_palette(void)
+
+static void setup_palette(void)
 {
     uint8_t i;
     for (i = 0; i < PALETTE_SIZE / 2; i++) {
@@ -103,10 +101,11 @@ void setup_palette(void)
         palette[i] = RED;
     }
 
-    gfx_palette_load(&vctx, palette, sizeof(uint8_t) * sizeof(palette), PALETTE_INDEX);
+    gfx_palette_load(&vctx, palette, sizeof(palette), PALETTE_INDEX);
 }
 
-void shift_palette(void)
+
+static void shift_palette (void)
 {
     uint8_t i;
     if (direction.x > 0) {
@@ -128,19 +127,72 @@ void shift_palette(void)
     }
 }
 
-void setup_ball(void)
+
+static void setup_ball(void)
 {
-    uint8_t x, y, i = 0;
-    uint8_t line[BALL_WIDTH];
+    static const uint8_t sphere_ztm[BALL_HEIGHT][BALL_WIDTH] = {
+        { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x00 },
+        { 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e },
+        { 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16 },
+        { 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e },
+        { 0x1f, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26 },
+        { 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e },
+        { 0x2f, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36 },
+        { 0x00, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x00 }
+    };
+
+    uint8_t y = 0;
     for (y = 0; y < BALL_HEIGHT; y++) {
-        for (x = 0; x < BALL_WIDTH; x++, i++) {
-            line[x] = SPRITE_INDEX + i;
-        }
-        gfx_tilemap_load(&vctx, line, BALL_WIDTH, 1, WIDTH - BALL_HEIGHT, HEIGHT - BALL_HEIGHT + y);
+        gfx_tilemap_load(&vctx, sphere_ztm[y], BALL_WIDTH, 1, WIDTH - BALL_WIDTH, HEIGHT - BALL_HEIGHT + y);
     }
 }
 
-void bounce_ball(void)
+
+static void setup_grid(void)
+{
+    static uint8_t grid_ztm[] = {
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,
+        0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x00, 0x00,
+        0x00, 0x01, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,
+        0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x00, 0x00, 0x00, 0x01, 0x02, 0x02,
+        0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,
+        0x02, 0x02, 0x00, 0x00, 0x00, 0x01, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,
+        0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x00, 0x00,
+        0x00, 0x01, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,
+        0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x00, 0x00, 0x00, 0x01, 0x02, 0x02,
+        0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,
+        0x02, 0x02, 0x00, 0x00, 0x00, 0x01, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,
+        0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x00, 0x00,
+        0x00, 0x01, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,
+        0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x00, 0x00, 0x00, 0x01, 0x02, 0x02,
+        0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,
+        0x02, 0x02, 0x00, 0x00, 0x00, 0x01, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,
+        0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x00, 0x00,
+        0x00, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
+        0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x00, 0x15, 0x16, 0x17, 0x18,
+        0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21, 0x22, 0x23, 0x24,
+        0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f, 0x30,
+        0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c,
+    };
+    uint8_t* ptr = grid_ztm;
+
+    for (uint16_t i = 0; i < sizeof(grid_ztm); i++) {
+        *ptr = *ptr + GRID_TILE_FROM;
+        ptr++;
+    }
+
+    ptr = grid_ztm;
+    for (uint8_t i = 0; i < HEIGHT; i++) {
+        gfx_tilemap_load(&vctx, ptr, 20, 0, 0, i);
+        ptr += WIDTH;
+    }
+}
+
+
+static void bounce_ball(void)
 {
     static int16_t acceleration = 0;
 
@@ -171,16 +223,19 @@ void bounce_ball(void)
     }
 }
 
+
 int main(void)
 {
     init();
     setup_palette();
     clear_layers();
     setup_ball();
+    setup_grid();
     uint16_t input = 0;
     while (1) {
         input = input_get();
-        if (START1)
+        /* On the native emulator, using START returns directly (need to flush the input?) */
+        if (BUTTON1_B)
             break;
 
         frames++;

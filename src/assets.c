@@ -21,23 +21,25 @@ gfx_error load_palette(gfx_context* ctx)
 }
 
 
-gfx_error load_tileset(gfx_context* ctx)
+gfx_error load_sphere(gfx_context* ctx)
 {
     static gfx_tileset_options options = {
-        .compression = TILESET_COMP_NONE,
+        .compression = TILESET_COMP_RLE,
     };
     gfx_error err = gfx_tileset_load(ctx, &_ball_tileset_start, &_ball_tileset_end - &_ball_tileset_start, &options);
 
-    if (err == GFX_SUCCESS) {
-        const uint8_t palette_count = (&_palette_end - &_palette_start) / 2;
-        options.compression = TILESET_COMP_1BIT;
-        /* Load the grid from tile GRID_TILE_FROM */
-        options.from_byte = GRID_TILE_FROM << 8u;
-        /* the last two colors in the palette are for the grid */
-        options.pal_offset = palette_count - 2;
-        err = gfx_tileset_load(ctx, &_grid_tileset_start, &_grid_tileset_end - &_grid_tileset_start, &options);
-    }
+    return err;
+}
 
+gfx_error load_background(gfx_context* ctx) {
+    const uint8_t palette_count = (&_palette_end - &_palette_start) / 2;
+    static gfx_tileset_options options = {
+        .compression = TILESET_COMP_1BIT,
+        /* Load the grid from tile GRID_TILE_FROM */
+        .from_byte = GRID_TILE_FROM << 8u,
+        /* the last two colors in the palette are for the grid */
+    };
+    gfx_error err = gfx_tileset_load(ctx, &_grid_tileset_start, &_grid_tileset_end - &_grid_tileset_start, &options);
     return err;
 }
 
@@ -47,8 +49,6 @@ static void __assets__(void) __naked
     __asm__(
         "__palette_start:\n"
         "    .incbin \"assets/sphere.ztp\"\n"
-        // Place the grid palette right after the ball's
-        "    .incbin \"assets/grid.ztp\"\n"
         "__palette_end:\n"
 
         "__ball_tileset_start:\n"

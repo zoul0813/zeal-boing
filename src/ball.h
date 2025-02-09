@@ -19,7 +19,7 @@
 #define BALL1 1
 #define BALL2 2
 
-#define PALETTE_INDEX 1
+#define PALETTE_INDEX 2
 #define PALETTE_SIZE  16
 #define WHITE 0xFFFF
 #define RED   0xF800

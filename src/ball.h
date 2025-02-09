@@ -1,4 +1,7 @@
 
+#ifndef BALL_H
+#define BALL_H
+
 #define SCREEN_MODE         ZVB_CTRL_VID_MODE_GFX_320_8BIT
 #define SCREEN_WIDTH        320
 #define SCREEN_HEIGHT       240
@@ -27,3 +30,4 @@
 #define SPRITE_INDEX    7
 #define SPRITE_COUNT    42
 
+#endif

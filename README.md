@@ -8,7 +8,8 @@ An Amiga Boing Ball inspired demo for Zeal 8-bit Computer
 
 ## Compile
 
-To compile the C demo
+To compile the demo:
+
 ```
-make -f sdcc.mk
+make
 ```

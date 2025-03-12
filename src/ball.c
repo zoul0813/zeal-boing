@@ -5,6 +5,7 @@
 #include <zos_video.h>
 #include <zvb_gfx.h>
 #include <zgdk.h>
+#include <zgdk/tilemap/scroll.h>
 
 #include "ball.h"
 #include "assets.h"

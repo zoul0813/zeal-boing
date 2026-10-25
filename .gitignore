@@ -3,3 +3,4 @@ tmp/
 *.ztp
 *.zts
 *.ztm
+build/

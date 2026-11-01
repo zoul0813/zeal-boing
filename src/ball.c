@@ -187,7 +187,7 @@ int main(void)
     setup_grid();
     uint16_t input = 0;
     while (1) {
-        input = input_get();
+        input = input_read();
         /* On the native emulator, using START returns directly (need to flush the input?) */
         if (BUTTON1_B)
             break;

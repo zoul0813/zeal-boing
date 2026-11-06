@@ -20,3 +20,7 @@ The build generates assets from the checked-in GIFs, preserving the conversion
 flags encoded in their filenames. Edit the Aseprite sources and export their GIFs
 before rebuilding. Generated assets stay in `build/assets/`; the program is
 `bin/boing.bin`.
+
+## License
+
+This project is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE).
